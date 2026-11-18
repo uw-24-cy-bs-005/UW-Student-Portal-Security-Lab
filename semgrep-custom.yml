@@ -1,0 +1,6 @@
+rules:
+  - id: ban-eval-usage
+    languages: [javascript]
+    severity: ERROR
+    message: Dangerous eval() call detected. eval() can execute arbitrary code.
+    pattern: eval(...)

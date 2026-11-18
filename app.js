@@ -36,18 +36,50 @@ function getSession() {
   return USERS.find((x) => String(x.id) === id) || null;
 }
 
+// Assignment A2: Safe redirect allowlist mitigating open redirects
+function safeRedirect(target) {
+  if (!target) return;
+  const ALLOWED_TARGETS = ["index.html", "./", "index.html#dash"];
+  if (ALLOWED_TARGETS.includes(target) && !target.startsWith("//") && !target.includes(":")) {
+    window.location.assign(target);
+  } else {
+    console.warn("Blocked untrusted redirect attempt:", target);
+  }
+}
+
+// Assignment A2: Login throttling (3 failed attempts -> 30s lockout)
+let failedAttempts = 0;
+let lockoutExpiry = 0;
+
 $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const now = Date.now();
+  if (now < lockoutExpiry) {
+    const remaining = Math.ceil((lockoutExpiry - now) / 1000);
+    $("loginMsg").textContent = `Too many failed attempts. Locked out for ${remaining}s.`;
+    return;
+  }
+
   const email = $("email").value;
   const pw = $("password").value;
   const u = USERS.find((x) => x.email === email);
+
   if (!u || (await sha256("uw" + u.id + pw)) !== u.passwordHash) {
-    $("loginMsg").textContent = "Login failed for " + email;
+    failedAttempts++;
+    if (failedAttempts >= 3) {
+      lockoutExpiry = Date.now() + 30000;
+      failedAttempts = 0;
+      $("loginMsg").textContent = "Too many failed attempts. Account temporarily locked for 30 seconds.";
+    } else {
+      $("loginMsg").textContent = `Login failed. Attempt ${failedAttempts} of 3.`;
+    }
     return;
   }
+
+  failedAttempts = 0;
   sessionStorage.setItem("uid", String(u.id));
   const next = params.get("next");
-  if (next) { location.href = next; return; }
+  if (next) { safeRedirect(next); return; }
   render();
 });
 
